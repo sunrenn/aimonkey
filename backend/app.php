@@ -151,9 +151,9 @@ function backend_handle_request(string $requestPath, string $method): bool
     json_response(404, ['error' => 'Route not found.']);
 }
 
-function frontend_render_entrypoint(): void
+function frontend_render_entrypoint(string $frontend_id): void
 {
-    $distIndexPath = __DIR__ . '/../frontend/dist/index.html';
+    $distIndexPath = __DIR__ . '/../'.$frontend_id.'/dist/index.html';
     if (!file_exists($distIndexPath)) {
         http_response_code(500);
         header('Content-Type: text/plain; charset=utf-8');

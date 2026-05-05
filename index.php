@@ -11,4 +11,4 @@ if (backend_handle_request($requestPath, $method)) {
 	return;
 }
 
-frontend_render_entrypoint();
+frontend_render_entrypoint("fe-pixi");
