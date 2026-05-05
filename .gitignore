@@ -1,0 +1,59 @@
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Runtime data
+pids/
+*.pid
+*.seed
+*.pid.lock
+
+# Dependency directories
+node_modules/
+
+# Build outputs
+dist/
+/assets
+build/
+coverage/
+.cache/
+.parcel-cache/
+.turbo/
+
+# Framework outputs
+.next/
+.nuxt/
+.svelte-kit/
+.vite/
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# TypeScript
+*.tsbuildinfo
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# IDE/editor
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Package manager stores
+.pnpm-store/
+.npm/
+.yarn/
+
+# Misc
+tmp/
+temp/
