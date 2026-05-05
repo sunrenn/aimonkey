@@ -17,6 +17,7 @@ CREATE TABLE IF NOT EXISTS users (
     avatar_state ENUM('active', 'frozen') NOT NULL DEFAULT 'active',
     avatar_count_for_contact INT NOT NULL DEFAULT 1,
     created_at DATETIME NOT NULL,
+    last_login_at DATETIME NOT NULL,
     INDEX idx_users_email (email)
 );
 

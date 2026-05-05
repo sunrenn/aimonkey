@@ -28,8 +28,12 @@ function handle_login(PDO $pdo, array $payload): array
 
         // Optional: Update last login timestamp
         $update = $pdo->prepare('UPDATE users SET last_login_at = NOW() WHERE id = :id');
+        return [
+            'status' => 401,
+            'body' => ['error' => $user['id']],
+        ];
         $update->execute(['id' => $user['id']]);
-
+        
         return [
             'status' => 200,
             'body' => [
