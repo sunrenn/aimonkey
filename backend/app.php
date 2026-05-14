@@ -148,6 +148,66 @@ function backend_handle_request(string $requestPath, string $method): bool
         json_response($result['status'], $result['body']);
     }
 
+    if ($requestPath === '/api/logout' && $method === 'POST') {
+        // For JWT-based auth, logout is handled client-side by deleting the token.
+        json_response(200, ['success' => true, 'message' => 'Logged out.']);
+    }
+
+    if ($requestPath === '/api/user' && $method === 'GET') {
+        $authHeader = $_SERVER['HTTP_AUTHORIZATION'] ?? '';
+        if (!str_starts_with($authHeader, 'Bearer ')) {
+            json_response(401, ['error' => 'Missing or invalid Authorization header.']);
+        }
+
+        $token = substr($authHeader, 7);
+        $user = authenticate_token($pdo, $token);
+        if (!$user) {
+            json_response(401, ['error' => 'Invalid or expired token.']);
+        }
+
+        json_response(200, ['user' => ['id' => $user['id'], 'email' => $user['email']]]);
+    }
+
+    if ($requestPath === '/api/avatars' && $method === 'GET') {
+        $authHeader = $_SERVER['HTTP_AUTHORIZATION'] ?? '';
+        if (!str_starts_with($authHeader, 'Bearer ')) {
+            json_response(401, ['error' => 'Missing or invalid Authorization header.']);
+        }
+
+        $token = substr($authHeader, 7);
+        $user = authenticate_token($pdo, $token);
+        if (!$user) {
+            json_response(401, ['error' => 'Invalid or expired token.']);
+        }
+
+        // Fetch avatars for the authenticated user
+        $stmt = $pdo->prepare('SELECT id, img_url, created_at FROM avartar_imgs WHERE user_id = :user_id');
+        $stmt->execute(['user_id' => $user['id']]);
+        $avatars = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        json_response(200, ['avatars' => $avatars]);
+    }
+
+    if ($requestPath === '/api/avatars' && $method === 'POST') {
+        $authHeader = $_SERVER['HTTP_AUTHORIZATION'] ?? '';
+        if (!str_starts_with($authHeader, 'Bearer ')) {
+            json_response(401, ['error' => 'Missing or invalid Authorization header.']);
+        }
+
+        $token = substr($authHeader, 7);
+        $user = authenticate_token($pdo, $token);
+        if (!$user) {
+            json_response(401, ['error' => 'Invalid or expired token.']);
+        }
+
+        // For simplicity, we'll just create a new avatar with a default name.
+        $stmt = $pdo->prepare('INSERT INTO avartar_imgs (user_id, img_url, created_at) VALUES (:user_id, :img_url, :created_at)');
+        $stmt->execute(['user_id' => $user['id'], 'img_url' => 'default.png', 'created_at' => date('Y-m-d H:i:s')]);
+        $avatarId = (int) $pdo->lastInsertId();
+
+        json_response(201, ['avatar' => ['id' => $avatarId, 'img_url' => 'default.png', 'created_at' => date('Y-m-d H:i:s')]]);
+    }
+
     json_response(404, ['error' => 'Route not found.']);
 }
 

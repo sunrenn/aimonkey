@@ -415,9 +415,10 @@ export async function bootstrapApp() {
 		submitTone: 'secondary',
 		fields: [
 			{ key: 'email', label: 'Email', placeholder: 'user@email.com' },
+			{ key: 'username', label: 'Username (optional)', placeholder: 'Input username' },
 			{ key: 'password', label: 'Password', placeholder: 'Input password', secure: true },
 		],
-		onSubmit: async ({ email, password }) => {
+		onSubmit: async ({ email, username, password }) => {
 			if (!emailPattern.test(email) || !password) {
 				setStatus('Email and password are required for login.');
 				return;
@@ -425,7 +426,7 @@ export async function bootstrapApp() {
 
 			setStatus('Signing in...');
 			try {
-				const data = await postJson('/api/login', { email, password });
+				const data = await postJson('/api/login', { email, username, password });
 				setStatus(data.message || 'Login successful.');
 			} catch (error) {
 				setStatus(error instanceof Error ? error.message : 'Login failed.');

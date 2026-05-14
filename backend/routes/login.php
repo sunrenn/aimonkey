@@ -6,6 +6,7 @@ function handle_login(PDO $pdo, array $payload): array
 {
     $email = trim((string) ($payload['email'] ?? ''));
     $password = (string) ($payload['password'] ?? '');
+    $username = trim((string) ($payload['username'] ?? ''));
 
     if ($email === '' || $password === '') {
         return [
@@ -15,8 +16,13 @@ function handle_login(PDO $pdo, array $payload): array
     }
 
     try {
-        $statement = $pdo->prepare('SELECT id, username, password_hash FROM users WHERE email = :email LIMIT 1');
-        $statement->execute(['email' => $email]);
+        if ($username !== '') {
+            $statement = $pdo->prepare('SELECT id, username, email, password_hash, avatar_state, created_at, last_login_at FROM users WHERE email = :email AND username = :username LIMIT 1');
+            $statement->execute(['email' => $email, 'username' => $username]);
+        } else {
+            $statement = $pdo->prepare('SELECT id, username, email, password_hash, avatar_state, created_at, last_login_at FROM users WHERE email = :email ORDER BY id ASC LIMIT 1');
+            $statement->execute(['email' => $email]);
+        }
         $user = $statement->fetch(PDO::FETCH_ASSOC);
 
         if (!$user || !password_verify($password, $user['password_hash'])) {
@@ -28,10 +34,10 @@ function handle_login(PDO $pdo, array $payload): array
 
         // Optional: Update last login timestamp
         $update = $pdo->prepare('UPDATE users SET last_login_at = NOW() WHERE id = :id');
-        return [
-            'status' => 401,
-            'body' => ['error' => $user['id']],
-        ];
+        // return [
+        //     'status' => 401,
+        //     'body' => ['error' => $user['id']],
+        // ];
         $update->execute(['id' => $user['id']]);
         
         return [
@@ -42,7 +48,10 @@ function handle_login(PDO $pdo, array $payload): array
                 'user' => [
                     'id' => $user['id'],
                     'username' => $user['username'],
-                    'email' => $email,
+                    'email' => $user['email'],
+                    'avatar_state' => $user['avatar_state'],
+                    'created_at' => $user['created_at'],
+                    'last_login_at' => $user['last_login_at'],
                 ],
             ],
         ];

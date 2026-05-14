@@ -10,5 +10,5 @@ $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
 if (backend_handle_request($requestPath, $method)) {
 	return;
 }
-
-frontend_render_entrypoint("fe-pixi");
+// prct  pixi
+frontend_render_entrypoint("fe-prct");
