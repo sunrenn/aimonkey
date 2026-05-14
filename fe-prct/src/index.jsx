@@ -1,11 +1,7 @@
 import { useState } from 'preact/hooks';
 import { hydrate, prerender as ssr } from 'preact-iso';
-import './style.less';
+import './style.css';
 
-/**
- * @param {string} url
- * @param {unknown} payload
- */
 async function postJson(url, payload) {
   const resp = await fetch(url, {
     method: 'POST',
@@ -21,19 +17,17 @@ export function Home() {
   const [mode, setMode] = useState('register');
   const [msg, setMsg] = useState('Ready');
   const [loading, setLoading] = useState(false);
-  const [user, setUser] = useState(/** @type {any} */ (null));
+  const [user, setUser] = useState(null);
 
   const [regUsername, setRegUsername] = useState('');
   const [regEmail, setRegEmail] = useState('');
 
-  const [loginEmail, setLoginEmail] = useState('');
-  const [loginUsername, setLoginUsername] = useState('');
+  const [loginIdentifier, setLoginIdentifier] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
 
   const [forgotEmail, setForgotEmail] = useState('');
   const [forgotUsername, setForgotUsername] = useState('');
 
-  /** @param {Event} e */
   const submitRegister = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -48,13 +42,12 @@ export function Home() {
     }
   };
 
-  /** @param {Event} e */
   const submitLogin = async (e) => {
     e.preventDefault();
     setLoading(true);
     setMsg('Signing in...');
     try {
-      const data = await postJson('/api/login', { email: loginEmail, username: loginUsername, password: loginPassword });
+      const data = await postJson('/api/login', { identifier: loginIdentifier, password: loginPassword });
       setUser(data.user);
       setMsg('登录成功');
     } catch (err) {
@@ -69,19 +62,17 @@ export function Home() {
       await postJson('/api/logout', {});
     } catch {}
     setUser(null);
-    setLoginEmail('');
-    setLoginUsername('');
+    setLoginIdentifier('');
     setLoginPassword('');
     setMsg('已退出登录');
   };
 
   const handleChangePassword = () => {
-    setForgotEmail(user?.email || loginEmail);
-    setForgotUsername(user?.username || loginUsername);
+    setForgotEmail(user.email);
+    setForgotUsername(user.username);
     setMode('forgot');
   };
 
-  /** @param {Event} e */
   const submitForgot = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -96,11 +87,9 @@ export function Home() {
     }
   };
 
-  /** @param {string | null | undefined} dateStr */
   const formatDate = (dateStr) => {
     if (!dateStr) return '-';
-    const d = new Date(dateStr);
-    return d.toLocaleString();
+    return new Date(dateStr).toLocaleString();
   };
 
   if (user) {
@@ -170,8 +159,7 @@ export function Home() {
 
       {mode === 'login' && (
         <form onSubmit={submitLogin}>
-          <input value={loginEmail} onInput={(e) => setLoginEmail(e.currentTarget.value)} placeholder="email" />
-          <input value={loginUsername} onInput={(e) => setLoginUsername(e.currentTarget.value)} placeholder="username (optional)" />
+          <input value={loginIdentifier} onInput={(e) => setLoginIdentifier(e.currentTarget.value)} placeholder="username or email" />
           <input type="password" value={loginPassword} onInput={(e) => setLoginPassword(e.currentTarget.value)} placeholder="password" />
           <div class="form-actions">
             <button type="button" class="forgot-btn" onClick={() => setMode('forgot')}>Forgot</button>
