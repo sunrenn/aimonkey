@@ -4,42 +4,49 @@ declare(strict_types=1);
 
 function handle_login(PDO $pdo, array $payload): array
 {
-    $email = trim((string) ($payload['email'] ?? ''));
+    $identifier = trim((string) ($payload['identifier'] ?? ''));
     $password = (string) ($payload['password'] ?? '');
-    $username = trim((string) ($payload['username'] ?? ''));
 
-    if ($email === '' || $password === '') {
+    if ($identifier === '' || $password === '') {
         return [
             'status' => 422,
-            'body' => ['error' => 'Email and password are required.'],
+            'body' => ['error' => 'Username/email and password are required.'],
         ];
     }
 
     try {
-        if ($username !== '') {
-            $statement = $pdo->prepare('SELECT id, username, email, password_hash, avatar_state, created_at, last_login_at FROM users WHERE email = :email AND username = :username LIMIT 1');
-            $statement->execute(['email' => $email, 'username' => $username]);
+        
+        if (str_contains($identifier, '@')) {
+            $statement = $pdo->prepare('SELECT id, username, email, password_hash, avatar_state, created_at, last_login_at FROM users WHERE email = :email');
+            $statement->execute(['email' => $identifier]);
         } else {
-            $statement = $pdo->prepare('SELECT id, username, email, password_hash, avatar_state, created_at, last_login_at FROM users WHERE email = :email ORDER BY id ASC LIMIT 1');
-            $statement->execute(['email' => $email]);
+            $statement = $pdo->prepare('SELECT id, username, email, password_hash, avatar_state, created_at, last_login_at FROM users WHERE username = :username');
+            $statement->execute(['username' => $identifier]);
         }
-        $user = $statement->fetch(PDO::FETCH_ASSOC);
 
-        if (!$user || !password_verify($password, $user['password_hash'])) {
+        $users = $statement->fetchAll(PDO::FETCH_ASSOC);
+
+        $users_passed = [];
+
+        for ($i = 0; $i < count($users); $i++) {
+            $pswdchk = password_verify($password, $users[$i]['password_hash']);
+            if ($pswdchk){
+                array_push($users_passed,$users[$i]);
+            }
+        }
+        
+        
+        if (count($users_passed) !== 1) {
             return [
                 'status' => 401,
-                'body' => ['error' => 'Invalid email or password.'],
+                'body' => ['error' => count($users_passed).' '.'Users Found! Invalid credentials or ambiguous login.'],
             ];
         }
-
-        // Optional: Update last login timestamp
-        $update = $pdo->prepare('UPDATE users SET last_login_at = NOW() WHERE id = :id');
-        // return [
-        //     'status' => 401,
-        //     'body' => ['error' => $user['id']],
-        // ];
-        $update->execute(['id' => $user['id']]);
         
+        $user = $users_passed[0];
+
+        $update = $pdo->prepare('UPDATE users SET last_login_at = NOW() WHERE id = :id');
+        $update->execute(['id' => $user['id']]);
         return [
             'status' => 200,
             'body' => [

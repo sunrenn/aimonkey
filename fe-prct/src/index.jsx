@@ -20,10 +20,10 @@ export function Home() {
   const [user, setUser] = useState(null);
 
   const [regUsername, setRegUsername] = useState('');
-  const [regEmail, setRegEmail] = useState('');
+  const [regEmail, setRegEmail] = useState();
 
-  const [loginIdentifier, setLoginIdentifier] = useState('');
-  const [loginPassword, setLoginPassword] = useState('');
+  const [loginIdentifier, setLoginIdentifier] = useState();
+  const [loginPassword, setLoginPassword] = useState();
 
   const [forgotEmail, setForgotEmail] = useState('');
   const [forgotUsername, setForgotUsername] = useState('');
@@ -47,9 +47,9 @@ export function Home() {
     setLoading(true);
     setMsg('Signing in...');
     try {
-      const data = await postJson('/api/login', { identifier: loginIdentifier, password: loginPassword });
+      const data = await postJson('/api/login', { identifier: loginIdentifier, password: loginPassword, tstmsg: "AIAIAI" });
       setUser(data.user);
-      setMsg('登录成功');
+      setMsg('登录成功'+"/"+loginIdentifier+"/"+loginPassword);
     } catch (err) {
       setMsg(err instanceof Error ? err.message : '登录失败');
     } finally {
@@ -133,21 +133,12 @@ export function Home() {
     <div class="home">
       <h1>AIMonkey</h1>
 
-      {mode === 'forgot' && (
-        <section style="display:flex;gap:8px;justify-content:center;margin-bottom:24px;">
-          <button onClick={() => setMode('register')}>Register</button>
-          <button onClick={() => setMode('login')}>Login</button>
-          <button disabled>Forgot</button>
-        </section>
-      )}
+      <section style="display:flex;gap:8px;justify-content:center;margin-bottom:24px;">
+        <button disabled={mode === 'register'} onClick={() => setMode('register')} > Register </button>
+        <button disabled={mode === 'login'} onClick={() => setMode('login')} > Login </button>
+        <button disabled={mode === 'forgot'} onClick={() => setMode('forgot')} > Forgot </button>
+      </section>
 
-      {mode !== 'forgot' && (
-        <section style="display:flex;gap:8px;justify-content:center;margin-bottom:24px;">
-          <button disabled={mode === 'register'} onClick={() => setMode('register')}>Register</button>
-          <button disabled={mode === 'login'} onClick={() => setMode('login')}>Login</button>
-          <button onClick={() => setMode('forgot')}>Forgot</button>
-        </section>
-      )}
 
       {mode === 'register' && (
         <form onSubmit={submitRegister}>

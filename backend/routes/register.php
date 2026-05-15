@@ -39,14 +39,16 @@ function handle_register(PDO $pdo, array $payload, array $config): array
             'status' => 422,
             'body' => ['error' => 'Email is required.'],
         ];
+
+        if (!(!is_valid_email($email))) {
+            return [
+                'status' => 422,
+                'body' => ['error' => 'Email format is not invalid.'],
+            ];
+        }
+
     }
 
-    if (!is_valid_email($email)) {
-        return [
-            'status' => 422,
-            'body' => ['error' => 'Email format is invalid.'],
-        ];
-    }
 
     $countStatement = $pdo->prepare('SELECT COUNT(*) FROM users WHERE email = :email');
     $countStatement->execute(['email' => $email]);
