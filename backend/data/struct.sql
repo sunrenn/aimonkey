@@ -21,6 +21,7 @@ CREATE TABLE IF NOT EXISTS users (
     avatar_count_for_contact INT NOT NULL DEFAULT 1,
     created_at DATETIME NOT NULL,
     last_login_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT uk_users_email_username UNIQUE (email, username),
     INDEX idx_users_email (email)
 );
 
