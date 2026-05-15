@@ -8,6 +8,23 @@ require_once __DIR__ . '/routes/register.php';
 require_once __DIR__ . '/routes/password.php';
 require_once __DIR__ . '/routes/login.php';
 
+function app_response(
+    int $status,
+    string $code,
+    string $message,
+    string $i18nKey,
+    array $i18nParams = [],
+    array $extra = []
+): void {
+    json_response($status, array_merge([
+        'success' => $status >= 200 && $status < 300,
+        'code' => $code,
+        'message' => $message,
+        'i18n_key' => $i18nKey,
+        'i18n_params' => $i18nParams,
+    ], $extra));
+}
+
 function backend_handle_request(string $requestPath, string $method): bool
 {
     if (!str_starts_with($requestPath, '/api')) {
@@ -27,7 +44,14 @@ function backend_handle_request(string $requestPath, string $method): bool
         $pdo = backend_create_pdo();
         $config = backend_load_runtime_config($pdo);
     } catch (Throwable $exception) {
-        json_response(500, ['error' => 'Database connection failed. Run backend/data/reset.php and verify MySQL settings.']);
+        app_response(
+            500,
+            'GATEWAY_DB_CONNECT_FAILED',
+            'Database connection failed. Run backend/data/reset.php and verify MySQL settings.',
+            'gateway.databaseConnectFailed',
+            [],
+            ['error' => 'Database connection failed. Run backend/data/reset.php and verify MySQL settings.']
+        );
     }
 
     if ($requestPath === '/api/health' && $method === 'GET') {
@@ -71,7 +95,14 @@ function backend_handle_request(string $requestPath, string $method): bool
         $rawBody = file_get_contents('php://input');
         $payload = json_decode($rawBody ?: '{}', true);
         if (!is_array($payload)) {
-            json_response(400, ['error' => 'Invalid JSON body.']);
+            app_response(
+                400,
+                'GATEWAY_INVALID_JSON_BODY',
+                'Invalid JSON body.',
+                'gateway.invalidJsonBody',
+                [],
+                ['error' => 'Invalid JSON body.']
+            );
         }
 
         $updates = [
@@ -101,14 +132,21 @@ function backend_handle_request(string $requestPath, string $method): bool
             ]);
         }
 
-        json_response(200, ['success' => true, 'message' => 'Mail config updated.']);
+        app_response(200, 'ADMIN_MAIL_CONFIG_UPDATED', 'Mail config updated.', 'admin.mailConfigUpdated');
     }
 
     if ($requestPath === '/api/register' && $method === 'POST') {
         $rawBody = file_get_contents('php://input');
         $payload = json_decode($rawBody ?: '{}', true);
         if (!is_array($payload)) {
-            json_response(400, ['error' => 'Invalid JSON body.']);
+            app_response(
+                400,
+                'GATEWAY_INVALID_JSON_BODY',
+                'Invalid JSON body.',
+                'gateway.invalidJsonBody',
+                [],
+                ['error' => 'Invalid JSON body.']
+            );
         }
 
         $result = handle_register($pdo, $payload, $config);
@@ -119,7 +157,14 @@ function backend_handle_request(string $requestPath, string $method): bool
         $rawBody = file_get_contents('php://input');
         $payload = json_decode($rawBody ?: '{}', true);
         if (!is_array($payload)) {
-            json_response(400, ['error' => 'Invalid JSON body.']);
+            app_response(
+                400,
+                'GATEWAY_INVALID_JSON_BODY',
+                'Invalid JSON body.',
+                'gateway.invalidJsonBody',
+                [],
+                ['error' => 'Invalid JSON body.']
+            );
         }
 
         $result = handle_password_forgot($pdo, $payload, $config);
@@ -130,7 +175,14 @@ function backend_handle_request(string $requestPath, string $method): bool
         $rawBody = file_get_contents('php://input');
         $payload = json_decode($rawBody ?: '{}', true);
         if (!is_array($payload)) {
-            json_response(400, ['error' => 'Invalid JSON body.']);
+            app_response(
+                400,
+                'GATEWAY_INVALID_JSON_BODY',
+                'Invalid JSON body.',
+                'gateway.invalidJsonBody',
+                [],
+                ['error' => 'Invalid JSON body.']
+            );
         }
 
         $result = handle_password_reset($pdo, $payload);
@@ -141,7 +193,14 @@ function backend_handle_request(string $requestPath, string $method): bool
         $rawBody = file_get_contents('php://input');
         $payload = json_decode($rawBody ?: '{}', true);
         if (!is_array($payload)) {
-            json_response(400, ['error' => 'Invalid JSON body.']);
+            app_response(
+                400,
+                'GATEWAY_INVALID_JSON_BODY',
+                'Invalid JSON body.',
+                'gateway.invalidJsonBody',
+                [],
+                ['error' => 'Invalid JSON body.']
+            );
         }
 
         $result = handle_login($pdo, $payload);
@@ -150,19 +209,33 @@ function backend_handle_request(string $requestPath, string $method): bool
 
     if ($requestPath === '/api/logout' && $method === 'POST') {
         // For JWT-based auth, logout is handled client-side by deleting the token.
-        json_response(200, ['success' => true, 'message' => 'Logged out.']);
+        app_response(200, 'LOGOUT_SUCCESS', 'Logged out.', 'auth.loggedOut');
     }
 
     if ($requestPath === '/api/user' && $method === 'GET') {
         $authHeader = $_SERVER['HTTP_AUTHORIZATION'] ?? '';
         if (!str_starts_with($authHeader, 'Bearer ')) {
-            json_response(401, ['error' => 'Missing or invalid Authorization header.']);
+            app_response(
+                401,
+                'AUTH_HEADER_MISSING_OR_INVALID',
+                'Missing or invalid Authorization header.',
+                'auth.headerMissingOrInvalid',
+                [],
+                ['error' => 'Missing or invalid Authorization header.']
+            );
         }
 
         $token = substr($authHeader, 7);
         $user = authenticate_token($pdo, $token);
         if (!$user) {
-            json_response(401, ['error' => 'Invalid or expired token.']);
+            app_response(
+                401,
+                'AUTH_TOKEN_INVALID_OR_EXPIRED',
+                'Invalid or expired token.',
+                'auth.tokenInvalidOrExpired',
+                [],
+                ['error' => 'Invalid or expired token.']
+            );
         }
 
         json_response(200, ['user' => ['id' => $user['id'], 'email' => $user['email']]]);
@@ -171,13 +244,27 @@ function backend_handle_request(string $requestPath, string $method): bool
     if ($requestPath === '/api/avatars' && $method === 'GET') {
         $authHeader = $_SERVER['HTTP_AUTHORIZATION'] ?? '';
         if (!str_starts_with($authHeader, 'Bearer ')) {
-            json_response(401, ['error' => 'Missing or invalid Authorization header.']);
+            app_response(
+                401,
+                'AUTH_HEADER_MISSING_OR_INVALID',
+                'Missing or invalid Authorization header.',
+                'auth.headerMissingOrInvalid',
+                [],
+                ['error' => 'Missing or invalid Authorization header.']
+            );
         }
 
         $token = substr($authHeader, 7);
         $user = authenticate_token($pdo, $token);
         if (!$user) {
-            json_response(401, ['error' => 'Invalid or expired token.']);
+            app_response(
+                401,
+                'AUTH_TOKEN_INVALID_OR_EXPIRED',
+                'Invalid or expired token.',
+                'auth.tokenInvalidOrExpired',
+                [],
+                ['error' => 'Invalid or expired token.']
+            );
         }
 
         // Fetch avatars for the authenticated user
@@ -191,13 +278,27 @@ function backend_handle_request(string $requestPath, string $method): bool
     if ($requestPath === '/api/avatars' && $method === 'POST') {
         $authHeader = $_SERVER['HTTP_AUTHORIZATION'] ?? '';
         if (!str_starts_with($authHeader, 'Bearer ')) {
-            json_response(401, ['error' => 'Missing or invalid Authorization header.']);
+            app_response(
+                401,
+                'AUTH_HEADER_MISSING_OR_INVALID',
+                'Missing or invalid Authorization header.',
+                'auth.headerMissingOrInvalid',
+                [],
+                ['error' => 'Missing or invalid Authorization header.']
+            );
         }
 
         $token = substr($authHeader, 7);
         $user = authenticate_token($pdo, $token);
         if (!$user) {
-            json_response(401, ['error' => 'Invalid or expired token.']);
+            app_response(
+                401,
+                'AUTH_TOKEN_INVALID_OR_EXPIRED',
+                'Invalid or expired token.',
+                'auth.tokenInvalidOrExpired',
+                [],
+                ['error' => 'Invalid or expired token.']
+            );
         }
 
         // For simplicity, we'll just create a new avatar with a default name.
@@ -208,7 +309,14 @@ function backend_handle_request(string $requestPath, string $method): bool
         json_response(201, ['avatar' => ['id' => $avatarId, 'img_url' => 'default.png', 'created_at' => date('Y-m-d H:i:s')]]);
     }
 
-    json_response(404, ['error' => 'Route not found.']);
+    app_response(
+        404,
+        'GATEWAY_ROUTE_NOT_FOUND',
+        'Route not found.',
+        'gateway.routeNotFound',
+        [],
+        ['error' => 'Route not found.']
+    );
 }
 
 function frontend_render_entrypoint(string $frontend_id): void

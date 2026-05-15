@@ -2,18 +2,37 @@
 
 declare(strict_types=1);
 
+function password_response(
+    int $status,
+    string $code,
+    string $message,
+    string $i18nKey,
+    array $i18nParams = [],
+    array $extra = []
+): array {
+    return [
+        'status' => $status,
+        'body' => array_merge([
+            'success' => $status >= 200 && $status < 300,
+            'code' => $code,
+            'message' => $message,
+            'i18n_key' => $i18nKey,
+            'i18n_params' => $i18nParams,
+        ], $extra),
+    ];
+}
+
 function handle_password_forgot(PDO $pdo, array $payload, array $config): array
 {
     $email = trim((string) ($payload['email'] ?? ''));
     $username = trim((string) ($payload['username'] ?? ''));
 
-    $genericResponse = [
-        'status' => 200,
-        'body' => [
-            'success' => true,
-            'message' => '如果账号存在，重置链接将发送到您的邮箱。',
-        ],
-    ];
+    $genericResponse = password_response(
+        200,
+        'PASSWORD_FORGOT_ACCEPTED',
+        'If the account exists, reset instructions were sent.',
+        'forgot.genericSuccess'
+    );
 
     if ($email === '' || !is_valid_email($email)) {
         return $genericResponse;
@@ -21,13 +40,14 @@ function handle_password_forgot(PDO $pdo, array $payload, array $config): array
 
     $secret = password_reset_secret();
     if ($secret === '') {
-        return [
-            'status' => 500,
-            'body' => [
-                'success' => false,
-                'error' => 'Server secret is not configured.',
-            ],
-        ];
+        return password_response(
+            500,
+            'PASSWORD_SECRET_MISSING',
+            'Server secret is not configured.',
+            'password.secretMissing',
+            [],
+            ['error' => 'Server secret is not configured.']
+        );
     }
 
     try {
@@ -123,35 +143,48 @@ function handle_password_reset(PDO $pdo, array $payload): array
     $newPassword = (string) ($payload['newPassword'] ?? '');
 
     if ($token === '') {
-        return [
-            'status' => 422,
-            'body' => ['success' => false, 'error' => 'Token is required.'],
-        ];
+        return password_response(
+            422,
+            'PASSWORD_RESET_TOKEN_REQUIRED',
+            'Token is required.',
+            'reset.tokenRequired',
+            [],
+            ['error' => 'Token is required.']
+        );
     }
 
     if (strlen($newPassword) < 8) {
-        return [
-            'status' => 422,
-            'body' => ['success' => false, 'error' => 'Password must be at least 8 characters.'],
-        ];
+        return password_response(
+            422,
+            'PASSWORD_RESET_TOO_SHORT',
+            'Password must be at least 8 characters.',
+            'reset.passwordTooShort',
+            ['minLength' => 8],
+            ['error' => 'Password must be at least 8 characters.']
+        );
     }
 
     if (!preg_match('/[A-Za-z]/', $newPassword) || !preg_match('/[0-9]/', $newPassword)) {
-        return [
-            'status' => 422,
-            'body' => ['success' => false, 'error' => 'Password must contain letters and numbers.'],
-        ];
+        return password_response(
+            422,
+            'PASSWORD_RESET_WEAK',
+            'Password must contain letters and numbers.',
+            'reset.passwordWeak',
+            [],
+            ['error' => 'Password must contain letters and numbers.']
+        );
     }
 
     $secret = password_reset_secret();
     if ($secret === '') {
-        return [
-            'status' => 500,
-            'body' => [
-                'success' => false,
-                'error' => 'Server secret is not configured.',
-            ],
-        ];
+        return password_response(
+            500,
+            'PASSWORD_SECRET_MISSING',
+            'Server secret is not configured.',
+            'password.secretMissing',
+            [],
+            ['error' => 'Server secret is not configured.']
+        );
     }
 
     $tokenHash = hash_reset_token($token, $secret);
@@ -173,10 +206,14 @@ function handle_password_reset(PDO $pdo, array $payload): array
 
         $row = $select->fetch(PDO::FETCH_ASSOC);
         if (!is_array($row)) {
-            return [
-                'status' => 400,
-                'body' => ['success' => false, 'error' => 'Token is invalid or expired.'],
-            ];
+            return password_response(
+                400,
+                'PASSWORD_RESET_TOKEN_INVALID',
+                'Token is invalid or expired.',
+                'reset.tokenInvalidOrExpired',
+                [],
+                ['error' => 'Token is invalid or expired.']
+            );
         }
 
         $userId = (int) $row['user_id'];
@@ -222,25 +259,25 @@ function handle_password_reset(PDO $pdo, array $payload): array
 
         $pdo->commit();
 
-        return [
-            'status' => 200,
-            'body' => [
-                'success' => true,
-                'message' => '密码重置成功，请使用新密码登录。',
-            ],
-        ];
+        return password_response(
+            200,
+            'PASSWORD_RESET_SUCCESS',
+            'Password reset successful. Please sign in with your new password.',
+            'reset.success'
+        );
     } catch (Throwable $exception) {
         if ($pdo->inTransaction()) {
             $pdo->rollBack();
         }
 
-        return [
-            'status' => 500,
-            'body' => [
-                'success' => false,
-                'error' => 'Password reset failed due to server error.',
-            ],
-        ];
+        return password_response(
+            500,
+            'PASSWORD_RESET_SERVER_ERROR',
+            'Password reset failed due to server error.',
+            'reset.serverError',
+            [],
+            ['error' => 'Password reset failed due to server error.']
+        );
     }
 }
 

@@ -22,30 +22,62 @@ function users_table_columns(PDO $pdo): array
     return $columns;
 }
 
+function register_response(
+    int $status,
+    string $code,
+    string $message,
+    string $i18nKey,
+    array $i18nParams = [],
+    array $extra = []
+): array {
+    return [
+        'status' => $status,
+        'body' => array_merge([
+            'success' => $status >= 200 && $status < 300,
+            'code' => $code,
+            'message' => $message,
+            'i18n_key' => $i18nKey,
+            'i18n_params' => $i18nParams,
+        ], $extra),
+    ];
+}
+
 function handle_register(PDO $pdo, array $payload, array $config): array
 {
     $username = trim((string) ($payload['username'] ?? ''));
     $email = trim((string) ($payload['email'] ?? ''));
 
     if ($username === '') {
-        return [
-            'status' => 422,
-            'body' => ['error' => 'Username is required.'],
-        ];
+        return register_response(
+            422,
+            'REG_USERNAME_REQUIRED',
+            'Username is required.',
+            'register.usernameRequired',
+            [],
+            ['error' => 'Username is required.']
+        );
     }
 
     if ($email === '') {
-        return [
-            'status' => 422,
-            'body' => ['error' => 'Email is required.'],
-        ];
+        return register_response(
+            422,
+            'REG_EMAIL_REQUIRED',
+            'Email is required.',
+            'register.emailRequired',
+            [],
+            ['error' => 'Email is required.']
+        );
     }
 
     if (!is_valid_email($email)) {
-        return [
-            'status' => 422,
-            'body' => ['error' => 'Email format is invalid.'],
-        ];
+        return register_response(
+            422,
+            'REG_EMAIL_INVALID',
+            'Email format is invalid.',
+            'register.emailInvalid',
+            [],
+            ['error' => 'Email format is invalid.']
+        );
     }
 
     $duplicateStatement = $pdo->prepare('SELECT COUNT(*) FROM users WHERE email = :email AND username = :username');
@@ -56,10 +88,14 @@ function handle_register(PDO $pdo, array $payload, array $config): array
     $sameIdentityCount = (int) $duplicateStatement->fetchColumn();
 
     if ($sameIdentityCount > 0) {
-        return [
-            'status' => 409,
-            'body' => ['error' => '该邮箱已注册过这个用户名，请使用其他用户名。'],
-        ];
+        return register_response(
+            409,
+            'REG_DUPLICATE_USERNAME_FOR_EMAIL',
+            'This email already has that username. Please choose another username.',
+            'register.duplicateUsernameForEmail',
+            [],
+            ['error' => '该邮箱已注册过这个用户名，请使用其他用户名。']
+        );
     }
 
     // Check for existing email to determine avatar state and count.
@@ -76,14 +112,17 @@ function handle_register(PDO $pdo, array $payload, array $config): array
             $usernamesStatement->fetchAll(PDO::FETCH_ASSOC)
         ), static fn (string $name): bool => $name !== ''));
 
-        return [
-            'status' => 409,
-            'body' => [
-                'success' => false,
+        return register_response(
+            409,
+            'REG_EMAIL_LIMIT_REACHED',
+            sprintf('This email has reached the registration limit (%d).', $avatarLimit),
+            'register.emailLimitReached',
+            ['limit' => $avatarLimit],
+            [
                 'error' => sprintf('该邮箱最多只能注册 %d 个账户，已达到上限。', $avatarLimit),
                 'registered_usernames' => $registeredUsernames,
-            ],
-        ];
+            ]
+        );
     }
 
     $avatarCountAfterCreate = $sameEmailCount + 1;
@@ -161,13 +200,14 @@ function handle_register(PDO $pdo, array $payload, array $config): array
         $mailSent = send_password_email($email, $username, $password, $config);
         if (!$mailSent) {
             $pdo->rollBack();
-            return [
-                'status' => 500,
-                'body' => [
-                    'success' => false,
-                    'error' => 'SMTP delivery failed. Please check mail settings and try again.',
-                ],
-            ];
+            return register_response(
+                500,
+                'REG_SMTP_DELIVERY_FAILED',
+                'SMTP delivery failed. Please check mail settings and try again.',
+                'register.smtpFailed',
+                [],
+                ['error' => 'SMTP delivery failed. Please check mail settings and try again.']
+            );
         }
 
         $pdo->commit();
@@ -177,26 +217,31 @@ function handle_register(PDO $pdo, array $payload, array $config): array
         }
 
         if ($exception instanceof PDOException && $exception->getCode() === '23000') {
-            return [
-                'status' => 409,
-                'body' => ['error' => '该邮箱已注册过这个用户名，请使用其他用户名。'],
-            ];
+            return register_response(
+                409,
+                'REG_DUPLICATE_USERNAME_FOR_EMAIL',
+                'This email already has that username. Please choose another username.',
+                'register.duplicateUsernameForEmail',
+                [],
+                ['error' => '该邮箱已注册过这个用户名，请使用其他用户名。']
+            );
         }
 
-        return [
-            'status' => 500,
-            'body' => [
-                'success' => false,
-                'error' => 'Registration failed due to server error.',
-            ],
-        ];
+        return register_response(
+            500,
+            'REG_SERVER_ERROR',
+            'Registration failed due to server error.',
+            'register.serverError',
+            [],
+            ['error' => 'Registration failed due to server error.']
+        );
     }
 
-    return [
-        'status' => 201,
-        'body' => [
-            'success' => true,
-            'message' => '注册成功，密码已发送到您的邮箱！',
-        ],
-    ];
+    return register_response(
+        201,
+        'REG_SUCCESS',
+        'Registration successful. Password has been sent to your email.',
+        'register.success',
+        []
+    );
 }

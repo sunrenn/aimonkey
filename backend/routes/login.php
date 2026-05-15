@@ -2,16 +2,40 @@
 
 declare(strict_types=1);
 
+function login_response(
+    int $status,
+    string $code,
+    string $message,
+    string $i18nKey,
+    array $i18nParams = [],
+    array $extra = []
+): array {
+    return [
+        'status' => $status,
+        'body' => array_merge([
+            'success' => $status >= 200 && $status < 300,
+            'code' => $code,
+            'message' => $message,
+            'i18n_key' => $i18nKey,
+            'i18n_params' => $i18nParams,
+        ], $extra),
+    ];
+}
+
 function handle_login(PDO $pdo, array $payload): array
 {
     $identifier = trim((string) ($payload['identifier'] ?? ''));
     $password = (string) ($payload['password'] ?? '');
 
     if ($identifier === '' || $password === '') {
-        return [
-            'status' => 422,
-            'body' => ['error' => 'Username/email and password are required.'],
-        ];
+        return login_response(
+            422,
+            'LOGIN_IDENTIFIER_PASSWORD_REQUIRED',
+            'Username/email and password are required.',
+            'login.identifierOrPasswordRequired',
+            [],
+            ['error' => 'Username/email and password are required.']
+        );
     }
 
     try {
@@ -37,21 +61,27 @@ function handle_login(PDO $pdo, array $payload): array
         
         
         if (count($users_passed) !== 1) {
-            return [
-                'status' => 401,
-                'body' => ['error' => count($users_passed).' '.'Users Found! Invalid credentials or ambiguous login.'],
-            ];
+            return login_response(
+                401,
+                'LOGIN_INVALID_OR_AMBIGUOUS',
+                'Invalid credentials or ambiguous login.',
+                'login.invalidOrAmbiguous',
+                ['matches' => count($users_passed)],
+                ['error' => count($users_passed) . ' Users Found! Invalid credentials or ambiguous login.']
+            );
         }
         
         $user = $users_passed[0];
 
         $update = $pdo->prepare('UPDATE users SET last_login_at = NOW() WHERE id = :id');
         $update->execute(['id' => $user['id']]);
-        return [
-            'status' => 200,
-            'body' => [
-                'success' => true,
-                'message' => 'Login successful.',
+        return login_response(
+            200,
+            'LOGIN_SUCCESS',
+            'Login successful.',
+            'login.success',
+            [],
+            [
                 'user' => [
                     'id' => $user['id'],
                     'username' => $user['username'],
@@ -60,12 +90,16 @@ function handle_login(PDO $pdo, array $payload): array
                     'created_at' => $user['created_at'],
                     'last_login_at' => $user['last_login_at'],
                 ],
-            ],
-        ];
+            ]
+        );
     } catch (Throwable $exception) {
-        return [
-            'status' => 500,
-            'body' => ['error' => 'Server error. Please try again later.'],
-        ];
+        return login_response(
+            500,
+            'LOGIN_SERVER_ERROR',
+            'Server error. Please try again later.',
+            'login.serverError',
+            [],
+            ['error' => 'Server error. Please try again later.']
+        );
     }
 }
